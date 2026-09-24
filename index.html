@@ -5,14 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Galaxy Solutions - Control de Inventario</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lector QR optimizado -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Animación de barrido láser rojo */
+    @keyframes scanAnimation {
+      0% { top: 0%; }
+      50% { top: 95%; }
+      100% { top: 0%; }
+    }
+    .laser-line {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background-color: #ef4444;
+      box-shadow: 0 0 8px #ef4444, 0 0 12px #ef4444;
+      animation: scanAnimation 2s infinite ease-in-out;
+      z-index: 10;
+    }
+    /* Estilo del visor del lector html5-qrcode */
+    #reader video {
+      object-fit: cover !important;
+      border-radius: 0.75rem;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800 flex flex-col">
 
-  <!-- Reemplaza con la URL generada en tu despliegue de Google Apps Script -->
   <script>
-    const APPS_SCRIPT_URL = "PEGA_AQUI_TU_URL_DE_APPS_SCRIPT";
+    // ⚠️ REEMPLAZA ESTA URL CON TU URL DE DESPLIEGUE DE GOOGLE APPS SCRIPT
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw0FmG8erQWhJZUdx5ytb-aYXro8Lc1AAXs4uS03qiT0PseNjbwe-QFU_H-jhIA2vLN4g/exec";
   </script>
 
   <!-- Navegación Superior -->
@@ -24,7 +49,7 @@
     <div class="w-6"></div>
   </header>
 
-  <!-- Overlay y Menú Lateral -->
+  <!-- Menú Lateral -->
   <div id="overlayMenu" onclick="closeMenu()" class="fixed inset-0 bg-black/50 z-20 hidden transition-opacity"></div>
   <aside id="sideMenu" class="fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-30 transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between">
     <div>
@@ -52,15 +77,24 @@
     </div>
   </aside>
 
-  <!-- Contenido -->
+  <!-- Contenido Principal -->
   <main class="flex-1 p-4 max-w-md w-full mx-auto">
     <section id="sec-venta" class="space-y-4">
       <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
         
-        <!-- Visor del escáner en vivo -->
-        <div id="reader" class="w-full bg-gray-900 rounded-xl mb-4 hidden overflow-hidden"></div>
+        <!-- Visor del escáner en vivo (Rectangular con barrido láser) -->
+        <div id="reader-container" class="hidden mb-4 p-3 bg-gray-900 rounded-2xl relative shadow-lg">
+          <div class="relative w-full overflow-hidden rounded-xl bg-black">
+            <div id="reader" class="w-full"></div>
+            <!-- Línea de barrido láser -->
+            <div id="laserLine" class="laser-line hidden"></div>
+          </div>
+          <button onclick="detenerEscaneo()" class="mt-3 w-full bg-red-600 text-white py-2 rounded-xl font-medium text-sm hover:bg-red-700 transition">
+            Cancelar Escaneo
+          </button>
+        </div>
         
-        <button id="btnCamara" onclick="iniciarEscaneoVivo()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium mb-4 hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+        <button id="btnCamara" onclick="iniciarEscaneoVivo()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium mb-4 hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-sm">
           <i data-lucide="camera" class="w-5 h-5"></i> Escanear Código QR en Vivo
         </button>
 
@@ -81,22 +115,22 @@
 
           <div>
             <label class="block text-sm font-medium text-gray-700">Código QR</label>
-            <input type="text" id="qr" required class="w-full mt-1 p-2.5 border rounded-xl bg-gray-50">
+            <input type="text" id="qr" required class="w-full mt-1 p-2.5 border rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
           </div>
           
           <div>
             <label class="block text-sm font-medium text-gray-700">Nombre del Producto</label>
-            <input type="text" id="nombre" class="w-full mt-1 p-2.5 border rounded-xl">
+            <input type="text" id="nombre" class="w-full mt-1 p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
           </div>
           
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-sm font-medium text-gray-700">Cantidad</label>
-              <input type="number" id="cantidad" min="1" required class="w-full mt-1 p-2.5 border rounded-xl">
+              <input type="number" id="cantidad" min="1" required class="w-full mt-1 p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Stock Mínimo</label>
-              <input type="number" id="cantMinima" min="0" class="w-full mt-1 p-2.5 border rounded-xl">
+              <input type="number" id="cantMinima" min="0" class="w-full mt-1 p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
             </div>
           </div>
           
@@ -109,8 +143,16 @@
       </div>
     </section>
 
+    <!-- Pestaña Inventario -->
     <section id="sec-inventario" class="space-y-4 hidden">
       <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <div class="flex items-center justify-between mb-3">
+          <input type="text" id="busqueda" onkeyup="filtrarTabla()" placeholder="Buscar producto..." class="w-full p-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <button onclick="cargarInventario()" class="ml-2 p-2.5 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200">
+            <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+          </button>
+        </div>
+
         <div class="overflow-x-auto">
           <table class="w-full text-left text-sm">
             <thead class="bg-gray-50 text-gray-500 text-xs uppercase border-b">
@@ -131,28 +173,63 @@
     lucide.createIcons();
     let html5QrcodeScanner = null;
 
-    // Escaneo en vivo vía cámara directo en el DOM
+    // Escaneo rápido en vivo con caja rectangular (30 FPS)
     function iniciarEscaneoVivo() {
-      const readerElem = document.getElementById('reader');
-      readerElem.classList.remove('hidden');
+      const container = document.getElementById('reader-container');
+      const laser = document.getElementById('laserLine');
+      
+      container.classList.remove('hidden');
+      laser.classList.remove('hidden');
 
       if (!html5QrcodeScanner) {
         html5QrcodeScanner = new Html5Qrcode("reader");
       }
 
-      html5QrcodeScanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          document.getElementById('qr').value = decodedText;
-          html5QrcodeScanner.stop();
-          readerElem.classList.add('hidden');
-        },
-        (errorMessage) => {}
-      ).catch(err => {
-        alert("Error de acceso a cámara: " + err);
-        readerElem.classList.add('hidden');
-      });
+      // Configuración rectangular optimizada para etiquetas
+      const config = { 
+        fps: 30, // 30 fotogramas por segundo para lectura ultra rápida
+        qrbox: { width: 300, height: 180 }, // Recuadro rectangular
+        aspectRatio: 1.333333,
+        videoConstraints: {
+          facingMode: { exact: "environment" },
+          focusMode: "continuous",
+          width: { min: 640, ideal: 1280 },
+          height: { min: 480, ideal: 720 }
+        }
+      };
+
+      const qrSuccessCallback = (decodedText) => {
+        document.getElementById('qr').value = decodedText;
+        detenerEscaneo();
+      };
+
+      // Iniciar con cámara trasera; si falla, conmuta a selección por defecto
+      html5QrcodeScanner.start({ facingMode: "environment" }, config, qrSuccessCallback)
+        .catch(() => {
+          html5QrcodeScanner.start({ facingMode: "user" }, config, qrSuccessCallback)
+            .catch(err => {
+              alert("No se pudo iniciar la cámara: " + err);
+              detenerEscaneo();
+            });
+        });
+    }
+
+    function detenerEscaneo() {
+      const container = document.getElementById('reader-container');
+      const laser = document.getElementById('laserLine');
+      
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+          container.classList.add('hidden');
+          laser.classList.add('hidden');
+        }).catch(() => {
+          container.classList.add('hidden');
+          laser.classList.add('hidden');
+        });
+      } else {
+        container.classList.add('hidden');
+        laser.classList.add('hidden');
+      }
     }
 
     function toggleMenu() {
@@ -173,39 +250,46 @@
       if (idSeccion === 'inventario') cargarInventario();
     }
 
+    // Registro enviando parámetros codificados en URL para evitar bloqueos CORS
     function guardarInventario(e) {
       e.preventDefault();
       const btn = document.getElementById('btnGuardar');
       const msg = document.getElementById('mensaje');
+      
       btn.disabled = true;
       btn.textContent = "Procesando...";
+      msg.classList.add('hidden');
 
-      const datos = {
+      const params = new URLSearchParams({
         action: "registrar",
         tipoMovimiento: document.querySelector('input[name="tipoMovimiento"]:checked').value,
         qr: document.getElementById('qr').value,
         nombre: document.getElementById('nombre').value,
         cantidad: document.getElementById('cantidad').value,
         cantMinima: document.getElementById('cantMinima').value
-      };
+      });
 
-      fetch(APPS_SCRIPT_URL, {
-        method: "POST",
-        body: JSON.stringify(datos)
+      fetch(`${APPS_SCRIPT_URL}?${params.toString()}`, {
+        method: "GET"
       })
       .then(res => res.json())
       .then(res => {
         btn.disabled = false;
         btn.textContent = "Registrar Movimiento";
         msg.textContent = res.mensaje;
-        msg.className = `mt-4 p-3 text-center font-medium text-sm rounded-xl block ${res.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
-        if (res.status === 'success') document.getElementById('invForm').reset();
+        
+        if (res.status === 'success') {
+          msg.className = "mt-4 p-3 text-center font-medium text-sm rounded-xl block bg-green-100 text-green-700 border border-green-200";
+          document.getElementById('invForm').reset();
+        } else {
+          msg.className = "mt-4 p-3 text-center font-medium text-sm rounded-xl block bg-red-100 text-red-700 border border-red-200";
+        }
       })
-      .catch(() => {
+      .catch((error) => {
         btn.disabled = false;
         btn.textContent = "Registrar Movimiento";
-        msg.textContent = "Error de comunicación.";
-        msg.className = "mt-4 p-3 text-center font-medium text-sm rounded-xl bg-red-100 text-red-700 block";
+        msg.textContent = "Error al conectar con el servidor.";
+        msg.className = "mt-4 p-3 text-center font-medium text-sm rounded-xl bg-red-100 text-red-700 border border-red-200 block";
       });
     }
 
@@ -220,13 +304,33 @@
           tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-400">Sin productos</td></tr>';
           return;
         }
-        tbody.innerHTML = res.data.map(p => `
-          <tr>
-            <td class="p-2 font-semibold">${p.nombre}<br><span class="text-xs text-gray-400">QR: ${p.qr}</span></td>
-            <td class="p-2 text-center font-bold">${p.cantidad}</td>
-            <td class="p-2 text-center text-xs text-gray-400">${p.cantMinima}</td>
-          </tr>
-        `).join('');
+        tbody.innerHTML = res.data.map(p => {
+          const esBajo = p.cantMinima > 0 && p.cantidad <= p.cantMinima;
+          return `
+            <tr class="hover:bg-gray-50">
+              <td class="p-2">
+                <div class="font-semibold text-gray-800">${p.nombre || 'Sin nombre'}</div>
+                <div class="text-xs text-gray-400">QR: ${p.qr}</div>
+              </td>
+              <td class="p-2 text-center font-bold ${esBajo ? 'text-red-600' : 'text-gray-700'}">
+                ${p.cantidad} ${esBajo ? '⚠️' : ''}
+              </td>
+              <td class="p-2 text-center text-xs text-gray-400">${p.cantMinima}</td>
+            </tr>
+          `;
+        }).join('');
+      })
+      .catch(() => {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-red-500">Error al cargar datos</td></tr>';
+      });
+    }
+
+    function filtrarTabla() {
+      const q = document.getElementById('busqueda').value.toLowerCase();
+      const filas = document.querySelectorAll('#tablaInventarioBody tr');
+      filas.forEach(f => {
+        const texto = f.textContent.toLowerCase();
+        f.style.display = texto.includes(q) ? '' : 'none';
       });
     }
   </script>
