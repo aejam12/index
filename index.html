@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Galaxy Solutions - Control de Inventario</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800 flex flex-col">
+
+  <!-- Reemplaza con la URL generada en tu despliegue de Google Apps Script -->
+  <script>
+    const APPS_SCRIPT_URL = "PEGA_AQUI_TU_URL_DE_APPS_SCRIPT";
+  </script>
+
+  <!-- Navegación Superior -->
+  <header class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+    <button onclick="toggleMenu()" class="p-2 rounded-lg hover:bg-gray-100 text-gray-600 focus:outline-none">
+      <i data-lucide="menu" class="w-6 h-6"></i>
+    </button>
+    <h1 id="tituloSeccion" class="font-bold text-lg text-gray-800">Registrar Movimiento</h1>
+    <div class="w-6"></div>
+  </header>
+
+  <!-- Overlay y Menú Lateral -->
+  <div id="overlayMenu" onclick="closeMenu()" class="fixed inset-0 bg-black/50 z-20 hidden transition-opacity"></div>
+  <aside id="sideMenu" class="fixed top-0 left-0 h-full w-72 bg-white shadow-2xl z-30 transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between">
+    <div>
+      <div class="p-5 border-b flex flex-col gap-2">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-700 text-white flex items-center justify-center font-bold text-lg">GS</div>
+          <div class="overflow-hidden">
+            <h3 class="font-bold text-gray-900 truncate">Galaxy Solutions EIRL</h3>
+            <p class="text-xs text-gray-500 truncate">dancx5739@gmail.com</p>
+          </div>
+        </div>
+        <div>
+          <span class="inline-block bg-emerald-100 text-emerald-800 text-xs font-semibold px-3 py-1 rounded-full">Plan Pro Activo</span>
+        </div>
+      </div>
+
+      <nav class="p-3 space-y-1">
+        <button onclick="navegarA('venta', 'Registrar Movimiento')" class="w-full flex items-center gap-4 px-4 py-3 text-emerald-700 bg-emerald-50 font-semibold rounded-xl transition">
+          <i data-lucide="shopping-bag" class="w-5 h-5 text-emerald-600"></i> Venta / Registro
+        </button>
+        <button onclick="navegarA('inventario', 'Inventario Actual')" class="w-full flex items-center gap-4 px-4 py-3 text-gray-700 font-medium rounded-xl hover:bg-gray-100 transition">
+          <i data-lucide="archive" class="w-5 h-5 text-gray-500"></i> Inventario
+        </button>
+      </nav>
+    </div>
+  </aside>
+
+  <!-- Contenido -->
+  <main class="flex-1 p-4 max-w-md w-full mx-auto">
+    <section id="sec-venta" class="space-y-4">
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+        
+        <!-- Visor del escáner en vivo -->
+        <div id="reader" class="w-full bg-gray-900 rounded-xl mb-4 hidden overflow-hidden"></div>
+        
+        <button id="btnCamara" onclick="iniciarEscaneoVivo()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium mb-4 hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+          <i data-lucide="camera" class="w-5 h-5"></i> Escanear Código QR en Vivo
+        </button>
+
+        <form id="invForm" onsubmit="guardarInventario(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Tipo de Movimiento</label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="flex items-center justify-center p-2.5 border rounded-xl cursor-pointer hover:bg-gray-50">
+                <input type="radio" name="tipoMovimiento" value="ENTRADA" checked class="mr-2 text-emerald-600">
+                <span class="font-semibold text-emerald-700 text-sm">🟢 Entrada</span>
+              </label>
+              <label class="flex items-center justify-center p-2.5 border rounded-xl cursor-pointer hover:bg-gray-50">
+                <input type="radio" name="tipoMovimiento" value="SALIDA" class="mr-2 text-emerald-600">
+                <span class="font-semibold text-red-600 text-sm">🔴 Salida</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Código QR</label>
+            <input type="text" id="qr" required class="w-full mt-1 p-2.5 border rounded-xl bg-gray-50">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Nombre del Producto</label>
+            <input type="text" id="nombre" class="w-full mt-1 p-2.5 border rounded-xl">
+          </div>
+          
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Cantidad</label>
+              <input type="number" id="cantidad" min="1" required class="w-full mt-1 p-2.5 border rounded-xl">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Stock Mínimo</label>
+              <input type="number" id="cantMinima" min="0" class="w-full mt-1 p-2.5 border rounded-xl">
+            </div>
+          </div>
+          
+          <button type="submit" id="btnGuardar" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 transition">
+            Registrar Movimiento
+          </button>
+        </form>
+
+        <div id="mensaje" class="mt-4 p-3 text-center font-medium text-sm rounded-xl hidden"></div>
+      </div>
+    </section>
+
+    <section id="sec-inventario" class="space-y-4 hidden">
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50 text-gray-500 text-xs uppercase border-b">
+              <tr>
+                <th class="p-2">Producto</th>
+                <th class="p-2 text-center">Stock</th>
+                <th class="p-2 text-center">Mín.</th>
+              </tr>
+            </thead>
+            <tbody id="tablaInventarioBody" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    lucide.createIcons();
+    let html5QrcodeScanner = null;
+
+    // Escaneo en vivo vía cámara directo en el DOM
+    function iniciarEscaneoVivo() {
+      const readerElem = document.getElementById('reader');
+      readerElem.classList.remove('hidden');
+
+      if (!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5Qrcode("reader");
+      }
+
+      html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          document.getElementById('qr').value = decodedText;
+          html5QrcodeScanner.stop();
+          readerElem.classList.add('hidden');
+        },
+        (errorMessage) => {}
+      ).catch(err => {
+        alert("Error de acceso a cámara: " + err);
+        readerElem.classList.add('hidden');
+      });
+    }
+
+    function toggleMenu() {
+      document.getElementById('sideMenu').classList.toggle('-translate-x-full');
+      document.getElementById('overlayMenu').classList.toggle('hidden');
+    }
+
+    function closeMenu() {
+      document.getElementById('sideMenu').classList.add('-translate-x-full');
+      document.getElementById('overlayMenu').classList.add('hidden');
+    }
+
+    function navegarA(idSeccion, titulo) {
+      document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
+      document.getElementById(`sec-${idSeccion}`).classList.remove('hidden');
+      document.getElementById('tituloSeccion').textContent = titulo;
+      closeMenu();
+      if (idSeccion === 'inventario') cargarInventario();
+    }
+
+    function guardarInventario(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnGuardar');
+      const msg = document.getElementById('mensaje');
+      btn.disabled = true;
+      btn.textContent = "Procesando...";
+
+      const datos = {
+        action: "registrar",
+        tipoMovimiento: document.querySelector('input[name="tipoMovimiento"]:checked').value,
+        qr: document.getElementById('qr').value,
+        nombre: document.getElementById('nombre').value,
+        cantidad: document.getElementById('cantidad').value,
+        cantMinima: document.getElementById('cantMinima').value
+      };
+
+      fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify(datos)
+      })
+      .then(res => res.json())
+      .then(res => {
+        btn.disabled = false;
+        btn.textContent = "Registrar Movimiento";
+        msg.textContent = res.mensaje;
+        msg.className = `mt-4 p-3 text-center font-medium text-sm rounded-xl block ${res.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
+        if (res.status === 'success') document.getElementById('invForm').reset();
+      })
+      .catch(() => {
+        btn.disabled = false;
+        btn.textContent = "Registrar Movimiento";
+        msg.textContent = "Error de comunicación.";
+        msg.className = "mt-4 p-3 text-center font-medium text-sm rounded-xl bg-red-100 text-red-700 block";
+      });
+    }
+
+    function cargarInventario() {
+      const tbody = document.getElementById('tablaInventarioBody');
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-400">Cargando...</td></tr>';
+
+      fetch(APPS_SCRIPT_URL)
+      .then(res => res.json())
+      .then(res => {
+        if (!res.data || res.data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-400">Sin productos</td></tr>';
+          return;
+        }
+        tbody.innerHTML = res.data.map(p => `
+          <tr>
+            <td class="p-2 font-semibold">${p.nombre}<br><span class="text-xs text-gray-400">QR: ${p.qr}</span></td>
+            <td class="p-2 text-center font-bold">${p.cantidad}</td>
+            <td class="p-2 text-center text-xs text-gray-400">${p.cantMinima}</td>
+          </tr>
+        `).join('');
+      });
+    }
+  </script>
+</body>
+</html>
